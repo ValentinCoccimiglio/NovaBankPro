@@ -77,6 +77,14 @@ button:hover {
   padding: 48px;
 }
 
+@media (max-width: 768px) {
+
+  .content {
+    padding: 20px;
+  }
+
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -170,9 +178,45 @@ button:hover {
 }
 
 @media (max-width: 768px) {
+
+  .sidebar {
+    width: 100%;
+
+    padding: 16px;
+  }
+
+  .sidebar nav {
+    flex-direction: row;
+
+    overflow-x: auto;
+
+    gap: 12px;
+  }
+
+}
+
+@media (max-width: 768px) {
   .dashboard {
     flex-direction: column;
   }
+  
+  @media (max-width: 768px) {
+
+  .sidebar {
+    width: 100%;
+
+    padding: 16px;
+  }
+
+  .sidebar nav {
+    flex-direction: row;
+
+    overflow-x: auto;
+
+    gap: 12px;
+  }
+
+}
 
   .sidebar {
     width: 100%;
@@ -196,6 +240,14 @@ button:hover {
 
     gap: 20px;
   }
+}
+
+@media (max-width: 768px) {
+
+  .executive-grid {
+    grid-template-columns: 1fr;
+  }
+
 }
 
 .analytics-section {
@@ -456,6 +508,14 @@ td {
   gap: 24px;
 }
 
+@media (max-width: 768px) {
+
+  .invoice-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
+
 .invoice-card {
   background: #111827;
 
@@ -485,6 +545,14 @@ td {
 
 .invoice-card h2 {
   font-size: 34px;
+}
+
+@media (max-width: 768px) {
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
 }
 
 .settings-grid {

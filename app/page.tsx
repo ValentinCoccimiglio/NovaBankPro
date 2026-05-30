@@ -99,7 +99,7 @@ export default function Home() {
             onClick={() => setActiveTab("dashboard")}
             className={activeTab === "dashboard" ? "sidebar-active" : ""}
           >
-            Dashboard
+            Inicio
           </button>
 
           <button
