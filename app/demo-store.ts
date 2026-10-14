@@ -57,12 +57,14 @@ export type DemoState = {
   movements: Movement[];
   services: Service[];
   persistenceAvailable: boolean;
+  recoveredInvalidData: boolean;
 };
 
 const initialState: DemoState = {
   movements: initialMovements,
   services: initialServices,
   persistenceAvailable: true,
+  recoveredInvalidData: false,
 };
 
 let demoState = initialState;
@@ -79,7 +81,7 @@ const isDemoTransfer = (value: unknown): value is DemoTransfer =>
   value.date === DEMO_REFERENCE_DATE &&
   typeof value.concept === "string" &&
   value.concept.length > 0 &&
-  value.concept.length <= 140 &&
+  value.concept.length <= 200 &&
   value.type === "expense" &&
   Number.isSafeInteger(value.amountCents) &&
   Number(value.amountCents) > 0 &&
@@ -140,7 +142,7 @@ const isPersistedDemoState = (
       (total, payment) => total + payment.movement.amountCents,
       0,
     );
-  return expensesCents <= initialBalanceCents;
+  return Number.isSafeInteger(expensesCents) && expensesCents <= initialBalanceCents;
 };
 
 const publish = () => subscribers.forEach((subscriber) => subscriber());
@@ -157,6 +159,7 @@ const persistState = (state: PersistedDemoState) => {
 const readSavedState = (): {
   state: PersistedDemoState;
   persistenceAvailable: boolean;
+  recoveredInvalidData?: boolean;
 } => {
   let saved: string | null;
   try {
@@ -186,8 +189,10 @@ const readSavedState = (): {
       transfers: parsed,
       servicePayments: [],
     };
-    const persistenceAvailable = persistState(migrated);
-    return { state: migrated, persistenceAvailable };
+    if (isPersistedDemoState(migrated)) {
+      const persistenceAvailable = persistState(migrated);
+      return { state: migrated, persistenceAvailable };
+    }
   }
   if (isPersistedDemoState(parsed)) {
     return { state: parsed, persistenceAvailable: true };
@@ -196,11 +201,13 @@ const readSavedState = (): {
   try {
     window.localStorage.removeItem(STORAGE_KEY);
     return {
+      recoveredInvalidData: true,
       state: { version: 2, transfers: [], servicePayments: [] },
       persistenceAvailable: true,
     };
   } catch {
     return {
+      recoveredInvalidData: true,
       state: { version: 2, transfers: [], servicePayments: [] },
       persistenceAvailable: false,
     };
@@ -226,6 +233,7 @@ const createSnapshot = (
         : service,
     ),
     persistenceAvailable,
+    recoveredInvalidData: false,
   };
 };
 
@@ -233,7 +241,7 @@ const initialize = () => {
   if (initialized) return;
   initialized = true;
   const saved = readSavedState();
-  demoState = createSnapshot(saved.state, saved.persistenceAvailable);
+  demoState = { ...createSnapshot(saved.state, saved.persistenceAvailable), recoveredInvalidData: saved.recoveredInvalidData ?? false };
 };
 
 export const subscribeToDemoState = (onChange: () => void) => {

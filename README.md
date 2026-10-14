@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NovaBank Pro
 
-## Getting Started
+Demo interactiva de banca personal para portfolio, con interfaz en español y datos ficticios. **Sin validez bancaria: no mueve dinero, no solicita datos bancarios ni genera comprobantes.**
 
-First, run the development server:
+## Funcionalidades
+
+- Inicio con saldo disponible, resumen del mes, movimientos recientes y próximos vencimientos.
+- Historial con búsqueda sin distinción de tildes, filtros por tipo, estado y fechas, y detalle informativo.
+- Transferencias simuladas a destinatarios predefinidos: ingreso, validación, revisión y resultado.
+- Pago simulado de servicios, con validación de saldo y prevención de pagos duplicados.
+- Mis gastos: selector de período, ingresos, egresos, balance y distribución por categoría. Comparación con el período anterior cuando existen registros; el mes de referencia compara días equivalentes.
+- Configuración con perfil ficticio, temas claro/oscuro, ocultación de importes y restablecimiento de la demo.
+- Navegación por teclado, foco visible, modales y respeto de movimiento reducido.
+
+## Tecnologías
+
+Next.js (App Router), React, TypeScript, CSS con variables, Geist mediante next/font, Recharts y Framer Motion. No se utiliza un backend bancario.
+
+## Ejecución local
+
+Con una versión de Node.js compatible con Next.js 16 (20.9 o superior):
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abrí http://localhost:3000. Para una compilación de producción:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+npm start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+La compilación necesita acceso a Google Fonts para descargar Geist mediante next/font.
 
-## Learn More
+## Verificación
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run lint
+npx tsc --noEmit
+node --test tests/demo.test.cjs
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Las pruebas usan el runner incorporado de Node y TypeScript ya instalado. Compilan los módulos de dominio en una carpeta temporal, sin tocar el estado del navegador. Cubren cálculos, categorías, duplicados, saldo, pagos, persistencia, migración y recuperación.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Modelo de datos
 
-## Deploy on Vercel
+`app/demo-data.ts` define la fecha de referencia de la demo (13 de octubre de 2026), el saldo inicial y los registros ficticios. Los importes se guardan en centavos. Solo los movimientos completados afectan el saldo y los resúmenes. Los egresos incluyen transferencias salientes y pagos de servicios; el balance del período no equivale al saldo disponible.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`app/demo-store.ts` integra operaciones y facturas. `app/spending.ts` calcula los resúmenes mensuales y `app/spending-panel.tsx` los presenta, con una alternativa textual al gráfico.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Persistencia y privacidad visual
+
+Las operaciones simuladas se guardan localmente bajo `novabank-demo-state`. El tema y la ocultación usan `novabank-theme` y `novabank-show-amounts`. No hay sincronización con un servidor. Si el almacenamiento está bloqueado, las operaciones pueden usarse durante la sesión; los datos inválidos se recuperan al estado inicial con un aviso.
+
+“Restablecer demo” requiere confirmación, elimina las operaciones simuladas y recupera las facturas iniciales sin borrar las preferencias de apariencia. Ocultar importes también retira el gráfico y sus tooltips. El monto de una transferencia permanece visible durante la edición y revisión; en servicios puede revelarse expresamente para confirmar.
+
+## Límites
+
+- Los datos son ejemplos, no un historial bancario completo ni asesoramiento financiero.
+- No hay cuentas reales, login, autenticación en dos pasos, envío de correos ni pagos reales.
+- No se generan recibos, comprobantes, exportaciones, QR ni códigos de autorización.
+- La navegación entre secciones es local a la pantalla; no hay URLs independientes por sección.
+- La persistencia local no ofrece garantías transaccionales entre varias pestañas que operen simultáneamente. Usar una pestaña para recorrer la demo.
+- El perfil es fijo y ficticio. No se recopilan datos personales.

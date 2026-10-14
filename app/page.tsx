@@ -7,15 +7,7 @@ import {
   useSyncExternalStore,
   type KeyboardEvent,
 } from "react";
-import {
-  LineChart,
-  Line,
-  ResponsiveContainer,
-  XAxis,
-  Tooltip,
-  BarChart,
-  Bar,
-} from "recharts";
+import SpendingPanel from "./spending-panel";
 import {
   DEMO_REFERENCE_DATE,
   OPENING_BALANCE_CENTS,
@@ -35,28 +27,6 @@ import {
   type DemoRecipientId,
 } from "./demo-store";
 
-const revenueData = [
-  { month: "Enero", revenue: 4000 },
-
-  { month: "Febrero", revenue: 6200 },
-
-  { month: "Marzo", revenue: 5800 },
-
-  { month: "Abril", revenue: 9100 },
-
-  { month: "Mayo", revenue: 12400 },
-
-  { month: "Junio", revenue: 14800 },
-];
-const expensesData = [
-  { month: "Enero", expenses: 2200 },
-  { month: "Febrero", expenses: 2800 },
-  { month: "Marzo", expenses: 3100 },
-  { month: "Abril", expenses: 4200 },
-  { month: "Mayo", expenses: 5100 },
-  { month: "Junio", expenses: 6200 },
-];
-
 const movementStatusLabels: Record<MovementStatus, string> = {
   completed: "Completado",
   pending: "Pendiente",
@@ -75,9 +45,6 @@ const serviceStatusLabels: Record<ServiceStatus, string> = {
   paid: "Pagado",
   rejected: "Rechazado",
 };
-
-const formatNumber = (value: number) =>
-  new Intl.NumberFormat("es-AR").format(value);
 
 const formatARS = (amountCents: number) =>
   new Intl.NumberFormat("es-AR", {
@@ -148,6 +115,7 @@ const parseARSAmount = (input: string): number | null => {
 };
 
 let fallbackDarkMode = true;
+let themeSessionOnly = false;
 const themeSubscribers = new Set<() => void>();
 
 function subscribeToTheme(onChange: () => void) {
@@ -161,6 +129,7 @@ function subscribeToTheme(onChange: () => void) {
 }
 
 function getDarkModeSnapshot() {
+  if (themeSessionOnly) return fallbackDarkMode;
   try {
     const savedTheme = window.localStorage.getItem("novabank-theme");
     if (savedTheme === "light" || savedTheme === "dark") {
@@ -185,6 +154,7 @@ function updateDarkMode(action: boolean | ((current: boolean) => boolean)) {
   try {
     window.localStorage.setItem("novabank-theme", nextValue ? "dark" : "light");
   } catch {
+    themeSessionOnly = true;
     // El modo elegido sigue vigente durante esta sesión aunque no se pueda guardar.
   }
 
@@ -192,6 +162,7 @@ function updateDarkMode(action: boolean | ((current: boolean) => boolean)) {
 }
 
 let fallbackShowAmounts = true;
+let amountsSessionOnly = false;
 const amountVisibilitySubscribers = new Set<() => void>();
 
 function subscribeToAmountVisibility(onChange: () => void) {
@@ -205,6 +176,7 @@ function subscribeToAmountVisibility(onChange: () => void) {
 }
 
 function getShowAmountsSnapshot() {
+  if (amountsSessionOnly) return fallbackShowAmounts;
   try {
     const savedPreference = window.localStorage.getItem(
       "novabank-show-amounts",
@@ -233,6 +205,7 @@ function updateShowAmounts(action: boolean | ((current: boolean) => boolean)) {
   try {
     window.localStorage.setItem("novabank-show-amounts", String(nextValue));
   } catch {
+    amountsSessionOnly = true;
     // La preferencia se mantiene durante la sesión si el navegador bloquea el almacenamiento.
   }
 
@@ -271,8 +244,6 @@ export default function Home() {
   const [selectedMovement, setSelectedMovement] = useState<Movement | null>(
     null,
   );
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [twoFactorAuth, setTwoFactorAuth] = useState(false);
   const movementDetailRef = useRef<HTMLDivElement>(null);
   const detailCloseButtonRef = useRef<HTMLButtonElement>(null);
   const transferEntryHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -376,7 +347,7 @@ export default function Home() {
     document
       .querySelector<HTMLElement>('nav button[aria-current="page"]')
       ?.focus();
-  }, [selectedServiceId]);
+  }, [selectedServiceId, servicePaymentStep]);
   const validDateRange =
     !movementFromDate ||
     !movementToDate ||
@@ -647,6 +618,8 @@ export default function Home() {
       return;
     }
     resetDemoState();
+    setSelectedMovement(null);
+    clearMovementFilters();
     startNewTransfer();
     closeServicePayment();
     setActiveTab("dashboard");
@@ -681,6 +654,7 @@ export default function Home() {
   return (
     <main className={darkMode ? "dashboard" : "dashboard light-mode"}>
       <aside className="sidebar">
+        <a className="skip-link" href="#main-content">Ir al contenido</a>
         <div className="brand">NovaBank</div>
         <button
           className="theme-toggle"
@@ -725,7 +699,7 @@ export default function Home() {
             className={activeTab === "analytics" ? "sidebar-active" : ""}
             aria-current={activeTab === "analytics" ? "page" : undefined}
           >
-            Analíticas
+            Mis gastos
           </button>
 
           <button
@@ -748,8 +722,9 @@ export default function Home() {
         </nav>
       </aside>
 
-      <section className="content">
-        {" "}
+      <section className="content" id="main-content" tabIndex={-1}>
+        <p className="demo-notice">Demo · Sin validez bancaria</p>
+        {demoState.recoveredInvalidData && <p className="persistence-notice" role="status">Se recuperó el estado inicial porque los datos guardados no eran válidos.</p>}
         {activeTab === "dashboard" && (
           <motion.div
             initial={pageInitial}
@@ -1429,110 +1404,8 @@ export default function Home() {
           </motion.div>
         )}
         {activeTab === "analytics" && (
-          <motion.div
-            initial={pageInitial}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            transition={pageTransition}
-          >
-            <header className="topbar">
-              <div>
-                <h1>Analíticas</h1>
-                <p>Descripción general del rendimiento</p>
-              </div>
-            </header>
-
-            <section className="analytics-section">
-              <div className="analytics-card">
-                <ResponsiveContainer width="100%" height={400}>
-                  <LineChart data={revenueData}>
-                    <XAxis
-                      dataKey="month"
-                      interval={0}
-                      tick={{ fill: darkMode ? "#aab7ca" : "#526078", fontSize: 11 }}
-                      axisLine={{ stroke: darkMode ? "#344258" : "#d7dfeb" }}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      formatter={(value) => formatNumber(Number(value))}
-                      contentStyle={{
-                        backgroundColor: darkMode ? "#172235" : "#ffffff",
-                        borderColor: darkMode ? "#344258" : "#d7dfeb",
-                        borderRadius: 12,
-                        color: darkMode ? "#f4f7fc" : "#172235",
-                      }}
-                      labelStyle={{ color: darkMode ? "#f4f7fc" : "#172235" }}
-                    />
-
-                    <Line
-                      type="monotone"
-                      dataKey="revenue"
-                      name="Ingresos"
-                      stroke="#3b82f6"
-                      strokeWidth={4}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </section>
-            <section className="analytics-grid">
-              <div className="analytics-card">
-                <h3>Gastos</h3>
-
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={expensesData}>
-                    <XAxis
-                      dataKey="month"
-                      interval={0}
-                      tick={{ fill: darkMode ? "#aab7ca" : "#526078", fontSize: 11 }}
-                      axisLine={{ stroke: darkMode ? "#344258" : "#d7dfeb" }}
-                      tickLine={false}
-                    />
-
-                    <Tooltip
-                      formatter={(value) => formatNumber(Number(value))}
-                      contentStyle={{
-                        backgroundColor: darkMode ? "#172235" : "#ffffff",
-                        borderColor: darkMode ? "#344258" : "#d7dfeb",
-                        borderRadius: 12,
-                        color: darkMode ? "#f4f7fc" : "#172235",
-                      }}
-                      labelStyle={{ color: darkMode ? "#f4f7fc" : "#172235" }}
-                    />
-
-                    <Bar dataKey="expenses" name="Gastos" fill="#8b5cf6" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </section>
-            <section className="executive-grid">
-              <div className="stat-card">
-                <p>Beneficio</p>
-
-                <h3 className="tabular-nums">$66.200</h3>
-
-                <span>+14,2%</span>
-              </div>
-
-              <div className="stat-card">
-                <p>Transacción promedio</p>
-
-                <h3 className="tabular-nums">$842</h3>
-
-                <span>+8,4%</span>
-              </div>
-
-              <div className="stat-card">
-                <p>Tasa de retención</p>
-
-                <h3>92%</h3>
-
-                <span>Estable</span>
-              </div>
-            </section>
-          </motion.div>
+          <SpendingPanel movements={demoMovements} showAmounts={showAmounts}
+            reducedMotion={shouldReduceMotion} onReveal={() => updateShowAmounts(true)} />
         )}
         {activeTab === "invoices" && (
           <motion.div
@@ -1691,48 +1564,34 @@ export default function Home() {
 
             <section className="settings-grid">
               <div className="settings-card">
-                <h3>Perfil</h3>
-
-                <p>NovaBank</p>
-
-                <span>Cuenta bancaria</span>
+                <h2>Perfil de demostración</h2>
+                <p>Valentín · Usuario ficticio</p>
+                <p className="setting-note">Cuenta de ejemplo en pesos argentinos. No se solicitan datos personales ni bancarios.</p>
               </div>
-
               <div className="settings-card">
-                <h3>Notificaciones por correo</h3>
-
-                <p className="setting-state" aria-live="polite">
-                  Estado: {emailNotifications ? "activadas" : "desactivadas"}
-                </p>
-                <button
-                  className="toggle-btn"
-                  type="button"
-                  onClick={() => setEmailNotifications((current) => !current)}
-                  aria-pressed={emailNotifications}
-                >
-                  {emailNotifications ? "Desactivar" : "Activar"}
-                </button>
+                <h2>Apariencia</h2>
+                <label htmlFor="theme-preference">Tema de la aplicación</label>
+                <select id="theme-preference" value={darkMode ? "dark" : "light"}
+                  onChange={(event) => updateDarkMode(event.target.value === "dark")}>
+                  <option value="dark">Modo oscuro</option>
+                  <option value="light">Modo claro</option>
+                </select>
+                <p className="setting-note">La preferencia se conserva en este navegador cuando el almacenamiento está disponible.</p>
               </div>
-
               <div className="settings-card">
-                <h3>Autenticación en dos pasos</h3>
-
-                <p className="setting-state" aria-live="polite">
-                  Estado: {twoFactorAuth ? "activada" : "desactivada"}
-                </p>
-                <p className="setting-note">
-                  Simulación visual; no activa una protección real.
-                </p>
-                <button
-                  className="toggle-btn"
-                  type="button"
-                  onClick={() => setTwoFactorAuth((current) => !current)}
-                  aria-pressed={twoFactorAuth}
-                >
-                  {twoFactorAuth ? "Desactivar" : "Activar"}
+                <h2>Privacidad visual</h2>
+                <p aria-live="polite">Importes {showAmounts ? "visibles" : "ocultos"} en las vistas informativas.</p>
+                <button className="toggle-btn" type="button" aria-pressed={!showAmounts}
+                  onClick={() => updateShowAmounts((current) => !current)}>
+                  {showAmounts ? "Ocultar importes" : "Mostrar importes"}
                 </button>
+                <p className="setting-note">El monto que ingresás al simular una transferencia permanece visible para revisarlo.</p>
               </div>
-
+              <div className="settings-card">
+                <h2>Acerca de NovaBank</h2>
+                <p>Proyecto de portfolio de banca personal. Los pagos y transferencias son simulaciones locales con datos ficticios.</p>
+                <p className="setting-note">No mueve dinero, no ofrece autenticación bancaria y no genera comprobantes.</p>
+              </div>
               <div className="settings-card reset-demo-card">
                 <h3>Datos de demostración</h3>
                 <p>
